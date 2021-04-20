@@ -43,11 +43,40 @@ def draw_bg():
         screen.blit(pine1_img, ((x * width) - bg_scroll * 0.7, SCREEN_HEIGHT - pine1_img.get_height() - 150))
         screen.blit(pine2_img, ((x * width) - bg_scroll * 0.8, SCREEN_HEIGHT - pine2_img.get_height()))
 
+class World():
+    def __init__(self):
+        self.obstacle_list = []
+        
+    def process_data(self, data):
+        self.level_length = len(data[0])
+        #iterate through each value in level data file
+        for y, row in enumerate(data):
+            for x, tile in enumerate(row):
+                if tile >= 0:
+                    img = img_list[tile]
+                    img_rect = img.get_rect()
+                    img_rect.x = x * TILE_SIZE
+                    img_rect.y = y * TILE_SIZE
+                    tile_data = (img, img_rect)
+                    if tile >= 0 and tile <= 8:
+                        self.obstacle_list.append(tile_data)
+                    elif tile == 15:#create player
+                        player = Player( x * TILE_SIZE, y * TILE_SIZE, 1.65, 20, 5)
+                        # health_bar = HealthBar(10, 10, player.health, player.health)
+        return player
+
+
+    def draw(self):
+        for tile in self.obstacle_list:
+            tile[1][0] += screen_scroll
+            screen.blit(tile[0], tile[1])
+
 class Player(pygame.sprite.Sprite):
     def __init__(self,x,y,scale,ammo,weapon):
         pygame.sprite.Sprite.__init__(self)
         self.alive = True
         self.ammo = ammo
+        self.speed = 5
         self.start_ammo = ammo
         self.shoot_cooldown = 0
         self.health = 100
@@ -61,7 +90,7 @@ class Player(pygame.sprite.Sprite):
         self.frame_index = 0
         self.action = 0
         self.update_time = pygame.time.get_ticks()
-        animation_types = ['idle','jump','run']
+        animation_types = ['idle','run','jump']
         for animation in animation_types:
             temp_list = []
             num_frame = len(os.listdir(f'img/player/{animation}'))
@@ -99,7 +128,21 @@ class Player(pygame.sprite.Sprite):
         self.rect.x +=dx
         self.rect.y +=dy
 
-        #ADD TILE COLLISION
+        for tile in world.obstacle_list:
+            #check collision in the x direction
+            if tile[1].colliderect(self.rect.x + dx, self.rect.y, self.width, self.height):
+                dx = 0
+            #check for collision in the y direction
+            if tile[1].colliderect(self.rect.x, self.rect.y + dy, self.width, self.height):
+                #check if below the ground, i.e. jumping
+                if self.vel_y < 0:
+                    self.vel_y = 0
+                    dy = tile[1].bottom - self.rect.top
+                #check if above the ground, i.e. falling
+                elif self.vel_y >= 0:
+                    self.vel_y = 0
+                    self.in_air = False
+                    dy = tile[1].top - self.rect.bottom
 
         #scroll
         if (self.rect.right > SCREEN_WIDTH - SCROLL_THRESH and bg_scroll < (world.level_length * TILE_SIZE) - SCREEN_WIDTH) or (self.rect.left < SCROLL_THRESH and bg_scroll > abs(dx)):
@@ -127,13 +170,59 @@ class Player(pygame.sprite.Sprite):
 
     def update(self):
         self.update_animation()
-        self.check_alive()
         if self.shoot_cooldown > 0:
             self.shoot_cooldown -= 1
 
+world_data = []
+for row in range(ROWS):
+    r = [-1] * COLS
+    world_data.append(r)
+#load in level data and create world
+with open(f'world.csv', newline='') as csvfile:
+    reader = csv.reader(csvfile, delimiter=',')
+    for x, row in enumerate(reader):
+        for y, tile in enumerate(row):
+            world_data[x][y] = int(tile)
+world = World()
+player = world.process_data(world_data)
 
-
-
-while True:
+run = True
+while run:
     clock.tick(FPS)
     draw_bg()
+    world.draw()
+    player.update()
+    player.draw()
+    if player.in_air:
+        player.update_action(2)
+    elif moving_left or moving_right:
+        player.update_action(1)
+    else:
+        player.update_action(0)
+    screen_scroll = player.move(moving_left, moving_right)
+    bg_scroll -= screen_scroll
+    for event in pygame.event.get():
+        #quit game
+        if event.type == pygame.QUIT:
+            run = False
+        #keyboard presses
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_a:
+                moving_left = True
+            if event.key == pygame.K_d:
+                moving_right = True
+            if event.key == pygame.K_w and player.alive:
+                player.jump = True
+            if event.key == pygame.K_ESCAPE:
+                run = False
+		#keyboard button released
+        if event.type == pygame.KEYUP:
+            if event.key == pygame.K_a:
+                moving_left = False
+            if event.key == pygame.K_d:
+                moving_right = False
+
+    pygame.display.update()
+
+pygame.quit()
+    

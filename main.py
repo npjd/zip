@@ -8,12 +8,12 @@ pygame.init()
 clock = pygame.time.Clock()
 FPS = 60
 
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = int(SCREEN_WIDTH * 0.8)
+SCREEN_WIDTH = 1000
+SCREEN_HEIGHT = int(SCREEN_WIDTH * .8)
 
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
-GRAVITY = 0.75
+GRAVITY = 0.50
 SCROLL_THRESH = 200
 ROWS = 16
 COLS = 150
@@ -29,6 +29,7 @@ for x in range(TILE_TYPES):
     img = pygame.transform.scale(img,(TILE_SIZE,TILE_SIZE))
     img_list.append(img)
 
+cursor = pygame.transform.scale(pygame.image.load("img/temp_cursor.jpeg"), (50, 50))
 pine1_img = pygame.image.load('img/Background/pine1.png').convert_alpha()
 pine2_img = pygame.image.load('img/Background/pine2.png').convert_alpha()
 mountain_img = pygame.image.load('img/Background/mountain.png').convert_alpha()
@@ -43,40 +44,22 @@ def draw_bg():
         screen.blit(pine1_img, ((x * width) - bg_scroll * 0.7, SCREEN_HEIGHT - pine1_img.get_height() - 150))
         screen.blit(pine2_img, ((x * width) - bg_scroll * 0.8, SCREEN_HEIGHT - pine2_img.get_height()))
 
-class World():
+class Cursor(pygame.sprite.Sprite):
     def __init__(self):
-        self.obstacle_list = []
-        
-    def process_data(self, data):
-        self.level_length = len(data[0])
-        #iterate through each value in level data file
-        for y, row in enumerate(data):
-            for x, tile in enumerate(row):
-                if tile >= 0:
-                    img = img_list[tile]
-                    img_rect = img.get_rect()
-                    img_rect.x = x * TILE_SIZE
-                    img_rect.y = y * TILE_SIZE
-                    tile_data = (img, img_rect)
-                    if tile >= 0 and tile <= 8:
-                        self.obstacle_list.append(tile_data)
-                    elif tile == 15:#create player
-                        player = Player( x * TILE_SIZE, y * TILE_SIZE, 1.65, 20, 5)
-                        # health_bar = HealthBar(10, 10, player.health, player.health)
-        return player
-
-
+        self.image = cursor
+        self.rect = self.image.get_rect()
+        self.rect.center = pygame.mouse.get_pos()
     def draw(self):
-        for tile in self.obstacle_list:
-            tile[1][0] += screen_scroll
-            screen.blit(tile[0], tile[1])
+        screen.blit(self.image, self.rect)
+    def update(self):
+        self.rect.center = pygame.mouse.get_pos()
 
 class Player(pygame.sprite.Sprite):
     def __init__(self,x,y,scale,ammo,weapon):
         pygame.sprite.Sprite.__init__(self)
         self.alive = True
         self.ammo = ammo
-        self.speed = 5
+        self.speed = 10
         self.start_ammo = ammo
         self.shoot_cooldown = 0
         self.health = 100
@@ -117,7 +100,7 @@ class Player(pygame.sprite.Sprite):
             dx = self.speed
             self.flip = False
             self.direction = 1
-        if self.jump == True and self.in_air ==False:
+        if self.jump is True and self.in_air is False:
             self.vel_y = -11
             self.jump = False
             self.in_air = True
@@ -125,8 +108,8 @@ class Player(pygame.sprite.Sprite):
         if self.vel_y >10:
             self.vel_y
         dy += self.vel_y
-        self.rect.x +=dx
-        self.rect.y +=dy
+
+        
 
         for tile in world.obstacle_list:
             #check collision in the x direction
@@ -143,6 +126,10 @@ class Player(pygame.sprite.Sprite):
                     self.vel_y = 0
                     self.in_air = False
                     dy = tile[1].top - self.rect.bottom
+        if self.rect.left + dx < 0 or self.rect.right + dx > SCREEN_WIDTH:
+            dx = 0
+        self.rect.x +=dx
+        self.rect.y +=dy
 
         #scroll
         if (self.rect.right > SCREEN_WIDTH - SCROLL_THRESH and bg_scroll < (world.level_length * TILE_SIZE) - SCREEN_WIDTH) or (self.rect.left < SCROLL_THRESH and bg_scroll > abs(dx)):
@@ -173,6 +160,34 @@ class Player(pygame.sprite.Sprite):
         if self.shoot_cooldown > 0:
             self.shoot_cooldown -= 1
 
+class World():
+    def __init__(self):
+        self.obstacle_list = []
+        
+    def process_data(self, data):
+        self.level_length = len(data[0])
+        #iterate through each value in level data file
+        for y, row in enumerate(data):
+            for x, tile in enumerate(row):
+                if tile >= 0:
+                    img = img_list[tile]
+                    img_rect = img.get_rect()
+                    img_rect.x = x * TILE_SIZE
+                    img_rect.y = y * TILE_SIZE
+                    tile_data = (img, img_rect)
+                    if tile >= 0 and tile <= 8:
+                        self.obstacle_list.append(tile_data)
+                    elif tile == 15:#create player
+                        player = Player( x * TILE_SIZE, y * TILE_SIZE, 3, 20, 5)
+                        # health_bar = HealthBar(10, 10, player.health, player.health)
+        return player
+
+
+    def draw(self):
+        for tile in self.obstacle_list:
+            tile[1][0] += screen_scroll
+            screen.blit(tile[0], tile[1])
+
 world_data = []
 for row in range(ROWS):
     r = [-1] * COLS
@@ -184,12 +199,19 @@ with open(f'world.csv', newline='') as csvfile:
         for y, tile in enumerate(row):
             world_data[x][y] = int(tile)
 world = World()
+cursor = Cursor()
 player = world.process_data(world_data)
 
 run = True
 while run:
     clock.tick(FPS)
     draw_bg()
+    cursor.draw()
+    cursor.update()
+    if cursor.rect.centerx < player.rect.centerx:
+        player.flip = True
+    else:
+        player.flip = False
     world.draw()
     player.update()
     player.draw()

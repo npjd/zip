@@ -71,7 +71,7 @@ class Player(pygame.sprite.Sprite):
         self.flip = False
         self.animation_list = []
         self.frame_index = 0
-        self.action = 0
+        self.action = 0        
         self.update_time = pygame.time.get_ticks()
         animation_types = ['idle','run','jump']
         for animation in animation_types:
@@ -87,6 +87,8 @@ class Player(pygame.sprite.Sprite):
         self.rect.center = (x, y)
         self.width = self.image.get_width()
         self.height = self.image.get_height()
+    def set_target(self, pos):
+        self.target = pygame.Vector2(pos)
     
     def move(self, moving_left, moving_right):
         screen_scroll = 0
@@ -136,6 +138,7 @@ class Player(pygame.sprite.Sprite):
             self.rect.x-=dx
             screen_scroll = -dx
         return screen_scroll
+    
 
     def update_animation(self):
         ANIMATION_COOLDOWN = 240
@@ -181,7 +184,7 @@ class World():
                         player = Player( x * TILE_SIZE, y * TILE_SIZE, 3, 20, 5)
                         # health_bar = HealthBar(10, 10, player.health, player.health)
         return player
-
+    
 
     def draw(self):
         for tile in self.obstacle_list:
@@ -204,25 +207,7 @@ player = world.process_data(world_data)
 
 run = True
 while run:
-    clock.tick(FPS)
-    draw_bg()
-    cursor.draw()
-    cursor.update()
-    if cursor.rect.centerx < player.rect.centerx:
-        player.flip = True
-    else:
-        player.flip = False
-    world.draw()
-    player.update()
-    player.draw()
-    if player.in_air:
-        player.update_action(2)
-    elif moving_left or moving_right:
-        player.update_action(1)
-    else:
-        player.update_action(0)
-    screen_scroll = player.move(moving_left, moving_right)
-    bg_scroll -= screen_scroll
+    
     for event in pygame.event.get():
         #quit game
         if event.type == pygame.QUIT:
@@ -243,6 +228,26 @@ while run:
                 moving_left = False
             if event.key == pygame.K_d:
                 moving_right = False
+
+    clock.tick(FPS)
+    draw_bg()
+    cursor.draw()
+    cursor.update()
+    if cursor.rect.centerx < player.rect.centerx:
+        player.flip = True
+    else:
+        player.flip = False
+    world.draw()
+    player.update()
+    player.draw()
+    if player.in_air:
+        player.update_action(2)
+    elif moving_left or moving_right:
+        player.update_action(1)
+    else:
+        player.update_action(0)
+    screen_scroll = player.move(moving_left, moving_right)
+    bg_scroll -= screen_scroll
 
     pygame.display.update()
 
